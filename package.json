@@ -1,0 +1,23 @@
+{
+    "name": "malta-restify",
+    "version": "0.0.1",
+    "description": "Malta plugin to start a raw minimal development rest server",
+    "main": "./index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/fedeghe/malta-rest.git"
+    },
+    "author": "Federico Ghedina <fedeghe@gmail.com>",
+    "license": "MIT",
+    "homepage": "https://github.com/fedeghe/malta-dev-srv#readme",
+    "dependencies": {
+        "malta": "^4.0.3",
+        "node-fetch": "^2.6.0",
+        "restify": "^8.3.3",
+        "restify-cors-middleware": "^1.1.1",
+        "restify-plugins": "^1.6.0"
+    }
+}
