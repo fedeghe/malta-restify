@@ -5,6 +5,7 @@ const fs = require('fs'),
     errors = require('restify-errors'),
     corsMiddleware = require('restify-cors-middleware'),
     plugins = require('restify-plugins'),
+    restifyBodyParser = plugins.bodyParser,
     cors = corsMiddleware({
         preflightMaxAge: 5,
         origins: ['*']
@@ -24,6 +25,7 @@ const requireUncached = module => {
 const put_post = (fname, payload) => {
     const data = requireUncached(fname)
     data.push(payload)
+    console.log(data)
     return fs.writeFileSync(fname, JSON.stringify(data))
 }
 
@@ -78,7 +80,7 @@ const getResponder = (verb, filePath, fname) => (req, res , next) => {
             }
             try {
                 console.log(req.params)
-                mutate[verb](filePath, req.params)
+                mutate[verb](filePath, req.body)
                 && res.send(204);
             } catch(e) {
                 console.log(e)
@@ -130,6 +132,7 @@ const getServer = () => {
     console.log('getting server')
     server = restify.createServer();
     server.use(plugins.queryParser());
+    server.use(restifyBodyParser());
     server.pre(cors.preflight);
     server.use(cors.actual);
     return {
