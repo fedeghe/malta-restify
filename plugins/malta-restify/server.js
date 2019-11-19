@@ -119,9 +119,9 @@ const requireUncached = module => {
                     })
                 })
                 server.listen(port, host, () => {
-                    console.log('%s listening at %s ', server.name, server.url);
+                    console.log('- %s listening at %s ', server.name, server.url);
                 });
-                console.log('start server')
+                console.log('- start server')
             });
         }catch(e) {
             console.log(e)
@@ -129,7 +129,8 @@ const requireUncached = module => {
     },
     getServer = () => {
         console.log('- getting server')
-        server = restify.createServer();
+        server && server.close()
+        server = restify.createServer({name: 'malta-restify'});
         server.use(plugins.queryParser());
         server.use(restifyBodyParser());
         server.pre(cors.preflight);

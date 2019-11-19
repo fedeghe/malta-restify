@@ -1,3 +1,3 @@
 {
-    "source/index.js": ". -plugins=malta-restify[endpoints:'source/restify.json']"
+    "source/index.js": ". -plugins=malta-restify[endpoints:'source/restify.json'] --options=verbose:0"
 }

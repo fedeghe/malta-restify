@@ -1,7 +1,10 @@
-{
-    "addresses": [
-        {
-            "address": "Kudamm 74"
-        }
-    ]
-}
+[
+    {
+        "idzzz": 1,
+        "address": "Kudamm 74"
+    },
+    {
+        "idzzz": 2,
+        "address": "HermanStraße 45"
+    }
+]
