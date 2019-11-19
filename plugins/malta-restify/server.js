@@ -37,7 +37,8 @@ const mutate = {
                 return d.id != id
             })
             console.log("newData", newData)
-            return fs.writeFileSync(fname, JSON.stringify(newData))
+            fs.writeFileSync(fname, JSON.stringify(newData))
+            return true;
         } catch(e) {
             console.log(e)
             return false;
