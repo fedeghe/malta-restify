@@ -1,0 +1,37 @@
+{
+    "del": [
+        {
+            "ep": "/person/:id",
+            "file": "./source/data/persons.json",
+            "id": "id"
+        }
+    ],
+    "put": [
+        {
+            "ep": "/person",
+            "file": "./source/data/persons.json"
+        }
+    ],
+    "post": [
+        {
+            "ep": "/person",
+            "file": "./source/data/persons.json"
+        }
+    ],
+    "get": [
+        {
+            "ep": "/persons",
+            "file": "source/data/persons.json"
+        },
+        {
+            "ep": "/adrs",
+            "file": "source/data/addresses.json"
+        }
+    ],
+    "head": [
+        {
+            "ep": "/persons",
+            "file": "./source/data/persons.json"
+        }
+    ]
+}
