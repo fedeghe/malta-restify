@@ -1,6 +1,3 @@
-
-let server = null;
-
 const fs = require('fs'),
     path = require('path'),
     restify = require('restify'),
@@ -11,8 +8,11 @@ const fs = require('fs'),
     cors = corsMiddleware({
         preflightMaxAge: 5,
         origins: ['*']
-    }),
-    requireUncached = requiredModule => {
+    });
+
+let server = null;
+
+const requireUncached = requiredModule => {
         const mod = require.resolve(path.resolve(requiredModule))
         if (mod && mod in require.cache) {
             delete require.cache[mod]
@@ -133,7 +133,23 @@ const fs = require('fs'),
         server.use(plugins.queryParser());
         server.use(restifyBodyParser());
         server.pre(cors.preflight);
+        server.pre(restify.plugins.pre.dedupeSlashes());
         server.use(cors.actual);
+        server.pre((req, res, next) => {
+            // console.log(res)
+            next();
+        })
+        server.on('after', (req, res, route, error) => {
+            if (!error) {
+                console.log([
+                    route.spec.method,
+                    route.spec.path.replace(/\:([A-Za-z]*)/, ($1, $2) => 
+                        $2 in req.params ? req.params[$2] : $2
+                    ),
+                    `(took ${+new Date - req.time()}ms)`
+                ].join(' '));
+            }
+        });
         return {
             start: (server !== null)
             ? start
