@@ -51,7 +51,7 @@ const requireUncached = requiredModule => {
     },
     getResponder = (verb, filePath, ep) =>
         (req, res , next) => {
-            const fname = ep.file,
+            const fname = ep.source,
                 k = ep.key || 'id'
             res.setHeader('Access-Control-Allow-Origin','*');
             res.setHeader('Server','malta-restify');
@@ -85,7 +85,7 @@ const requireUncached = requiredModule => {
                         );
                     }
                     try {
-                        action[verb](filePath, req.body);
+                        action[verb](filePath, req.body)
                         && res.send(204);
                     } catch(e) {
                         console.log(e);
@@ -154,7 +154,7 @@ class Server {
                      * 
                      */
                     eps[verb].forEach(ep => {
-                        const fpath = path.resolve(folder, ep.file);
+                        const fpath = path.resolve(folder, ep.source);
                         try {
                             this.srv[verb]({path : ep.key ? ep.ep.replace(/\:id/, `:${ep.key}`) : ep.ep} , getResponder(verb, fpath, ep));
                         } catch(e) {

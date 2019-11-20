@@ -2,46 +2,46 @@
     "del": [
         {
             "ep": "/person/:id",
-            "file": "./source/data/persons.json",
+            "source": "./source/data/persons.json",
             "id": "id"
         }
     ],
     "put": [
         {
             "ep": "/persons",
-            "file": "./source/data/persons.json"
+            "source": "./source/data/persons.json"
         }
     ],
     "post": [
         {
             "ep": "/persons",
-            "file": "./source/data/persons.json"
+            "source": "./source/data/persons.json"
         }
     ],
     "get": [
         {
             "ep": "/persons",
-            "file": "source/data/persons.json"
+            "source": "source/data/persons.json"
         },
         {
             "ep": "/person/:id",
-            "file": "source/data/persons.json"
+            "source": "source/data/persons.json"
         },
         {
             "ep": "/addresses",
-            "file": "source/data/addresses.json",
+            "source": "source/data/addresses.json",
             "key": "idzzz"
         },
         {
             "ep": "/addresse/:id",
-            "file": "source/data/addresses.json",
+            "source": "source/data/addresses.json",
             "key": "idzzz"
         }
     ],
     "head": [
         {
             "ep": "/persons",
-            "file": "./source/data/persons.json"
+            "source": "./source/data/persons.json"
         }
     ]
 }
