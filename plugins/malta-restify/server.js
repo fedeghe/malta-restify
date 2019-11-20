@@ -123,7 +123,7 @@ class Server {
         
         this.srv.on('after', (req, res, route, error) => {
             if (!error) {
-                console.log([
+                this.malta.log_info([
                     route.spec.method,
                     route.spec.path.replace(/\:([A-Za-z]*)/, ($1, $2) => 
                         $2 in req.params ? req.params[$2] : $2
