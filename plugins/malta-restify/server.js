@@ -1,4 +1,6 @@
 
+let server = null;
+
 const fs = require('fs'),
     path = require('path'),
     restify = require('restify'),
@@ -9,16 +11,13 @@ const fs = require('fs'),
     cors = corsMiddleware({
         preflightMaxAge: 5,
         origins: ['*']
-    });
-
-let server = null;
-
-const requireUncached = module => {
-        const mod = require.resolve(path.resolve(module))
+    }),
+    requireUncached = requiredModule => {
+        const mod = require.resolve(path.resolve(requiredModule))
         if (mod && mod in require.cache) {
             delete require.cache[mod]
         }
-        const ret = require(path.resolve(module))
+        const ret = require(path.resolve(requiredModule))
         return ret || []
     },
     put_post = (fname, payload) => {
