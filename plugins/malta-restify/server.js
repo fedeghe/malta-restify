@@ -9,6 +9,7 @@ const fs = require('fs'),
         preflightMaxAge: 5,
         origins: ['*']
     });
+
 let srv;
 
 const requireUncached = requiredModule => {
@@ -80,14 +81,14 @@ const requireUncached = requiredModule => {
                 case 'put':
                     if (!req.is('application/json')) {
                         return next(
-                            new errors.InvalidContentError("Expects 'application/json'"),
+                            new errors.InvalidContentError("Expects 'application/json'")
                         );
                     }
                     try {
-                        action[verb](filePath, req.body)
+                        action[verb](filePath, req.body);
                         && res.send(204);
                     } catch(e) {
-                        console.log(e)
+                        console.log(e);
                     }
                     res.send(404);
                     break;
@@ -153,31 +154,24 @@ class Server {
                      * 
                      */
                     eps[verb].forEach(ep => {
-                        const fpath = path.resolve(folder, ep.file)
+                        const fpath = path.resolve(folder, ep.file);
                         try {
                             this.srv[verb]({path : ep.key ? ep.ep.replace(/\:id/, `:${ep.key}`) : ep.ep} , getResponder(verb, fpath, ep));
                         } catch(e) {
-                            console.log('Error' ,e)
+                            this.malta.log_err('Error' ,e);
                         }
                     })
                 })
                 this.srv.listen(port, host, () => {
                     this.malta.log_info(`- ${this.srv.name} listening at ${this.srv.url}`);
                 });
-                this.malta.log_info('- start server')
+                this.malta.log_info('- start server');
             });
         }catch(e) {
-            malta.log_err(e)
+            malta.log_err(e);
         }    
     }
 }
-
-
-
-
-
-
-
 module.exports = {
     getServer: () => {
         if (!srv) {
@@ -185,4 +179,4 @@ module.exports = {
         }
         return srv;
     }
-}
+};
