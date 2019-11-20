@@ -8,6 +8,7 @@
     },
     "scripts": {
         "build": "malta build.json",
-        "postinstall": "cd plugins/malta-restify && yarn install"
+        "postinstall": "cd plugins/malta-restify && yarn install",
+        "bananabomb": "malta -clean && rm -rf yarn.lock node_modules plugins/malta-restify/node_modules "
     }
 }

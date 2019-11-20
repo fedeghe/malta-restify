@@ -9,8 +9,7 @@ const fs = require('fs'),
         preflightMaxAge: 5,
         origins: ['*']
     });
-
-let server = null;
+let srv;
 
 const requireUncached = requiredModule => {
         const mod = require.resolve(path.resolve(requiredModule))
@@ -95,51 +94,34 @@ const requireUncached = requiredModule => {
                 default: break;
             }
             return next();
-        },
-    start = (port, host, folder, endpoints) => {
-        try{
-            fs.readFile(path.resolve(folder, endpoints), 'utf8', (err, data) => {
-                if (err) throw 'Error reading endpoint file'
-                const eps = JSON.parse(data)
-                Object.keys(eps).forEach(verb => {
-                    /**
-                     * 
-                     * Verbs here are 
-                     * del, get, head, opts, post, put, and patch
-                     * 
-                     */
-                    eps[verb].forEach(ep => {
-                        const fpath = path.resolve(folder, ep.file)
-                        try {
-                            server[verb]({path : ep.key ? ep.ep.replace(/\:id/, `:${ep.key}`) : ep.ep} , getResponder(verb, fpath, ep));
-                        } catch(e) {
-                            console.log('Error' ,e)
-                        }
-                    })
-                })
-                server.listen(port, host, () => {
-                    console.log('- %s listening at %s ', server.name, server.url);
-                });
-                console.log('- start server')
-            });
-        }catch(e) {
-            console.log(e)
-        }    
-    },
-    getServer = () => {
-        console.log('- getting server')
-        server && server.close()
-        server = restify.createServer({name: 'malta-restify'});
-        server.use(plugins.queryParser());
-        server.use(restifyBodyParser());
-        server.pre(cors.preflight);
-        server.pre(restify.plugins.pre.dedupeSlashes());
-        server.use(cors.actual);
-        server.pre((req, res, next) => {
-            // console.log(res)
-            next();
-        })
-        server.on('after', (req, res, route, error) => {
+        };
+
+
+
+class Server {
+    constructor () {
+        this.srv = null;
+        this.dir = null;
+        this.name = path.basename(path.dirname(__filename));
+        this.started = false;
+        this.malta = null;
+    }
+    init (port, host, folder) {
+        this.started = true;
+        this.malta.log_info(`> ${this.name.blue()} started on port # ${port} (http://${host}:${port})`);
+        this.malta.log_info(`> webroot is ${folder}`.blue());
+        this.dir = process.cwd();
+
+        this.srv = restify.createServer({name: 'malta-restify'});
+        
+        this.srv.pre(cors.preflight);
+        this.srv.pre(restify.plugins.pre.dedupeSlashes());
+
+        this.srv.use(plugins.queryParser());
+        this.srv.use(restifyBodyParser());
+        this.srv.use(cors.actual);
+        
+        this.srv.on('after', (req, res, route, error) => {
             if (!error) {
                 console.log([
                     route.spec.method,
@@ -150,15 +132,57 @@ const requireUncached = requiredModule => {
                 ].join(' '));
             }
         });
-        return {
-            start: (server !== null)
-            ? start
-            : () => {
-                throw ':[] server not created'
-            }
-        }
-    };
+
+        return this;
+    }
+
+    start ({port, host, folder, endpoints, malta}) {
+        if (this.started) return;
+        this.malta = malta;
+        this.init(port, host, folder);
+
+        try{
+            fs.readFile(path.resolve(folder, endpoints), 'utf8', (err, data) => {
+                if (err) this.malta.log_err('Error reading endpoint file');
+                const eps = JSON.parse(data);
+                Object.keys(eps).forEach(verb => {
+                    /**
+                     * 
+                     * Verbs here are 
+                     * del, get, head, opts, post, put, and patch
+                     * 
+                     */
+                    eps[verb].forEach(ep => {
+                        const fpath = path.resolve(folder, ep.file)
+                        try {
+                            this.srv[verb]({path : ep.key ? ep.ep.replace(/\:id/, `:${ep.key}`) : ep.ep} , getResponder(verb, fpath, ep));
+                        } catch(e) {
+                            console.log('Error' ,e)
+                        }
+                    })
+                })
+                this.srv.listen(port, host, () => {
+                    this.malta.log_info(`- ${this.srv.name} listening at ${this.srv.url}`);
+                });
+                this.malta.log_info('- start server')
+            });
+        }catch(e) {
+            malta.log_err(e)
+        }    
+    }
+}
+
+
+
+
+
+
 
 module.exports = {
-    getServer
+    getServer: () => {
+        if (!srv) {
+            srv = new Server();
+        }
+        return srv;
+    }
 }
