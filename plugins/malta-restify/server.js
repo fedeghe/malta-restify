@@ -29,7 +29,7 @@ const fs = require('fs'),
         }
         return fs.writeFileSync(fname, JSON.stringify(data))
     },
-    mutate = {
+    action = {
         del: (fname, id, k) => {
             try{
                 const data = requireUncached(fname),
@@ -42,65 +42,65 @@ const fs = require('fs'),
             }
         },
         put:put_post,
-        post:put_post
-    },
-    head = (fname, res) => {
-        const content = requireUncached(fname);
-        res.setHeader('content-length', content.toString().length);
-        res.setHeader('content-type', 'application/json');
-    },
-    getResponder = (verb, filePath, ep) => (req, res , next) => {
-        const fname = ep.file;
-        res.setHeader('Access-Control-Allow-Origin','*');
-        res.setHeader('Server','malta-restify');
-        const k = ep.key || 'id'
-        switch(verb) {
-            case 'del': 
-                if (k in req.params) {
-                    mutate.del(filePath, req.params.id, k) && res.send(204);
-                }
-                break;
-            case 'get': 
-                try {
-                    
-                    if (k in req.params) {
-                        let r = requireUncached(fname)
-                        res.send(200, r.filter(e => e[k] == req.params[k]));
-                    } else {
-                        res.send(200, requireUncached(fname));
-                    }
-                }catch(e) {
-                    console.log(e)
-                }
-                break;
-            case 'head':
-                head(fname, res);
-                res.send(200);
-                break;
-            case 'post': 
-            case 'put':
-                if (!req.is('application/json')) {
-                    return next(
-                        new errors.InvalidContentError("Expects 'application/json'"),
-                    );
-                }
-                try {
-                    mutate[verb](filePath, req.body)
-                    && res.send(204);
-                } catch(e) {
-                    console.log(e)
-                }
-                res.send(404);
-                break;
-            default: break;
+        post:put_post,
+        head: (fname, res) => {
+            const content = requireUncached(fname);
+            res.setHeader('content-length', content.toString().length);
+            res.setHeader('content-type', 'application/json');
         }
-        return next();
     },
+    getResponder = (verb, filePath, ep) =>
+        (req, res , next) => {
+            const fname = ep.file,
+                k = ep.key || 'id'
+            res.setHeader('Access-Control-Allow-Origin','*');
+            res.setHeader('Server','malta-restify');
+            switch(verb) {
+                case 'del': 
+                    k in req.params
+                    && action.del(filePath, req.params.id, k)
+                    && res.send(204);
+                    break;
+                case 'get': 
+                    try {
+                        if (k in req.params) {
+                            let r = requireUncached(fname)
+                            res.send(200, r.filter(e => e[k] == req.params[k]));
+                        } else {
+                            res.send(200, requireUncached(fname));
+                        }
+                    }catch(e) {
+                        console.log(e)
+                    }
+                    break;
+                case 'head':
+                    action.head(fname, res);
+                    res.send(200);
+                    break;
+                case 'post': 
+                case 'put':
+                    if (!req.is('application/json')) {
+                        return next(
+                            new errors.InvalidContentError("Expects 'application/json'"),
+                        );
+                    }
+                    try {
+                        action[verb](filePath, req.body)
+                        && res.send(204);
+                    } catch(e) {
+                        console.log(e)
+                    }
+                    res.send(404);
+                    break;
+                default: break;
+            }
+            return next();
+        },
     start = (port, host, folder, endpoints) => {
         try{
             fs.readFile(path.resolve(folder, endpoints), 'utf8', (err, data) => {
-                const eps = JSON.parse(data)
                 if (err) throw 'Error reading endpoint file'
+                const eps = JSON.parse(data)
                 Object.keys(eps).forEach(verb => {
                     /**
                      * 
