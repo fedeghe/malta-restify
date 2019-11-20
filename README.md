@@ -14,8 +14,6 @@ This plugin can be started on any file
 It starts a really raw simple http server on the host and port needed, default values are the following:
 - **conf**: config file that holds the following params:
 
-dfsdf
-
 - port
 - host   
 - entrypoints: [entrypoint]  

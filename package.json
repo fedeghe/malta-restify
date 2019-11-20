@@ -7,6 +7,7 @@
         "malta": "^4.0.5"
     },
     "scripts": {
-        "build": "malta build.json"
+        "build": "malta build.json",
+        "postinstall": "cd plugins/malta-restify && yarn install"
     }
 }
