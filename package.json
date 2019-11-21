@@ -1,12 +1,26 @@
 {
     "name": "malta-restify",
     "version": "1.0.0",
-    "main": "index.js",
+    "description": "Malta plugin to start a development rest server.",
+    "repository": {
+        "type": "git",
+        "url": "https://fedeghe@github.com/fedeghe/malta-restify.git"
+    },
+    "keywords": [
+        "malta",
+        "malta plugin",
+        "malta restify"
+    ],
+    "author": "Federico Ghedina <fedeghe@gmail.com>",
     "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/fedeghe/malta-restify/issues"
+    },
     "dependencies": {
         "restify": "^8.4.0",
         "restify-cors-middleware": "^1.1.1",
         "restify-errors": "^8.0.1",
         "restify-plugins": "^1.6.0"
-    }
+    },
+    "main": "index.js"
 }
