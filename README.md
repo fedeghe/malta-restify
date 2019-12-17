@@ -20,7 +20,7 @@ It starts a really raw simple http server, parameters:
 
 So for example if we want to start it automatically at (first) build, using _public_ as webRoot, with a specific ip on a specific port:  
 ```
-> malta source/index.js public -plugins=malta-restify[pendpoints:\"source/restify.json\"]
+> malta source/index.js public -plugins=malta-restify[endpoints:\"source/restify.json\"]
 ```
 or in the .json file :
 ```
@@ -58,9 +58,8 @@ the entrypoints have the following structure (in the example _source/restify.jso
         {
             "ep": "/person/:id",
             "source": "source/data/persons.json"
-        },
-        ...
-    }
+        }   
+    ]
 }
 ``` 
 
