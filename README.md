@@ -1,6 +1,5 @@
 ---
 [![npm version](https://badge.fury.io/js/malta-restify.svg)](http://badge.fury.io/js/malta-restify)
-[![Dependencies](https://david-dm.org/fedeghe/malta-restify.svg)](https://david-dm.org/fedeghe/malta-restify)
 [![npm downloads](https://img.shields.io/npm/dt/malta-restify.svg)](https://npmjs.org/package/malta-restify)
 [![npm downloads](https://img.shields.io/npm/dm/malta-restify.svg)](https://npmjs.org/package/malta-restify)  
 ---  

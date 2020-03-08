@@ -1,4 +1,4 @@
-var srv = require('./server'),
+const srv = require('./server'),
     path = require('path'),
     fs = require('fs');
 
@@ -14,7 +14,7 @@ function malta_restify(obj, options = {}) {
     let msg;
 
     server.start({port, host, folder, endpoints, malta: self});
-    return function (solve, reject) {
+    return (solve, reject) => {
         solve(obj);
         self.notifyAndUnlock(start, msg);
     }
