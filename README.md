@@ -13,7 +13,7 @@ It starts a really raw simple http server, parameters:
 - entrypoints (mandatory)  
 - port [3001]
 - host [127.0.0.1]
-- folder [execution one, if givern must be relative to it]
+- folder [execution one, if given must be relative to it]
 
 
 
