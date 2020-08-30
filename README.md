@@ -40,7 +40,7 @@ the entrypoints have the following structure (in the example _source/restify.jso
         {
             "ep": "/person/:id",
             "source": "./source/data/persons.json",
-            "id": "id"
+            "key": "id"
         }
     ],
     "post": [
@@ -56,14 +56,26 @@ the entrypoints have the following structure (in the example _source/restify.jso
         },
         {
             "ep": "/person/:id",
-            "source": "source/data/persons.json"
+            "source": "source/data/persons.json",
+            "key": "id"
         }   
     ]
 }
+/// and persons.json could be  something like
+[
+    {
+        "id": 1,
+        "name": "Federico"
+    },
+    {
+        "id": 2,
+        "name": "Gabriele"
+    }
+]
 ``` 
 
-where the `source` referenced file has to be relative to the current folder.
+where the `source` referenced file has to be relative to the current execution folder.
 
-The only thing one needs to take care of is for example in the case of the `GET /person/:id` 
-here the `id` key must be present inside the _persons.json_ file since will be used for retriving
+The only thing one needs to take care of when referencing a specific element for example in the case of the `GET /person/:id` is that 
+here the `key` value must be present inside the _persons.json_ file since will be used for retriving
 the specific object (or to delete it, check the first DEL rule)

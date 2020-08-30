@@ -64,8 +64,9 @@ const requireUncached = requiredModule => {
                 case 'get': 
                     try {
                         if (k in req.params) {
-                            let r = requireUncached(fname)
-                            res.send(200, r.filter(e => e[k] == req.params[k]));
+                            let r = requireUncached(fname),
+                                set = r.filter(e => e[k] == req.params[k]);
+                            res.send(200, set.length > 1 ? set : set[0] || []);
                         } else {
                             res.send(200, requireUncached(fname));
                         }
