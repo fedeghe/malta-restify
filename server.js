@@ -12,6 +12,16 @@ const fs = require('fs'),
 
 let srv;
 
+const uniqueID = new function () {
+    let count = +new Date;
+    const self = this;
+    this.prefix = 'ID_';
+    this.toString = function () {
+        count += 1;
+        return self.prefix + count;
+    };
+}
+
 const requireUncached = requiredModule => {
         const mod = require.resolve(path.resolve(requiredModule))
         if (mod && mod in require.cache) {
@@ -20,85 +30,117 @@ const requireUncached = requiredModule => {
         const ret = require(path.resolve(requiredModule))
         return ret || []
     },
-    put_post = (fname, payload) => {
-        let data = requireUncached(fname)
-        if (payload instanceof Array) {
-            data = data.concat(payload)
-        } else {
-            data.push(payload)
-        }
-        return fs.writeFileSync(fname, JSON.stringify(data))
-    },
+    beautifyJson = json => JSON.stringify(json, null, 2)
     action = {
-        del: (fname, id, k) => {
+        del: ({filePath, req, key}) => {
             try{
-                const data = requireUncached(fname),
-                    newData = data.filter(d => d[k] != id)
-                fs.writeFileSync(fname, JSON.stringify(newData))
+                const data = requireUncached(filePath)
+                    .filter(d => d[key] != req.params[key])
+                fs.writeFileSync(filePath, beautifyJson(data))
                 return true;
             } catch(e) {
                 console.log(e)
                 return false;
             }
         },
-        put:put_post,
-        post:put_post,
-        head: (fname, res) => {
-            const content = requireUncached(fname);
-            res.setHeader('content-length', content.toString().length);
+        //update
+        put: ({filePath, req, key}) => {
+            const payload = req.body;
+            try {
+                const data = requireUncached(filePath)
+                    .reduce((acc, el) => {
+                        if (el[key] == req.params[key]) {
+                            // do not reset others with
+                            // el = {[k]: el[k]}
+                            // could be an idea to make it optional with req.params.clean
+                            for (let f in payload) el[f] = payload[f];
+                        }
+                        acc.push(el)
+                        return acc
+                    }, [])
+                fs.writeFileSync(filePath, beautifyJson(data))
+                return true;
+            } catch(e) {
+                console.log(e)
+                return false;
+            }
+        },
+        // create
+        post: ({filePath, req, key}) => {
+            const payload = req.body;
+            try {
+                let data = requireUncached(filePath)
+                if (payload instanceof Array) {
+                    data = data.concat(payload.map(record => ({...record, [key]: `${uniqueID}`})))
+                } else {
+                    data.push({...payload, [key]: `${uniqueID}`})
+                }
+                fs.writeFileSync(filePath, beautifyJson(data))
+                return true;
+            } catch (e) {
+                console.log(e)
+                return false;
+            }
+        },
+        head: ({filePath, res, key, req}) => {
+            const content = requireUncached(filePath),
+                cnt = key ? content.filter(row => row[key] == req.params[key]) : content;
+            res.setHeader('content-length', cnt.toString().length);
             res.setHeader('content-type', 'application/json');
+        },
+        get: ({req, filePath, ep}) => {
+            const r = requireUncached(filePath),
+                k = ep.key || 'id';
+            if (k in req.params) {
+                let set = r.filter(e => e[k] == req.params[k]);
+                return set.length > 1 ? set : set[0] || []
+            }
+            return requireUncached(filePath);
         }
     },
     getResponder = (verb, filePath, ep) =>
         (req, res , next) => {
-            const fname = ep.source,
-                k = ep.key || 'id'
+            const key = ep.key || 'id',
+                responder = action[verb];
+
             res.setHeader('Access-Control-Allow-Origin','*');
             res.setHeader('Server','malta-restify');
-            switch(verb) {
-                case 'del': 
-                    k in req.params
-                    && action.del(filePath, req.params.id, k)
-                    && res.send(204);
-                    break;
-                case 'get': 
-                    try {
-                        if (k in req.params) {
-                            let r = requireUncached(fname),
-                                set = r.filter(e => e[k] == req.params[k]);
-                            res.send(200, set.length > 1 ? set : set[0] || []);
-                        } else {
-                            res.send(200, requireUncached(fname));
-                        }
-                    }catch(e) {
-                        console.log(e)
-                    }
-                    break;
-                case 'head':
-                    action.head(fname, res);
-                    res.send(200);
-                    break;
-                case 'post': 
-                case 'put':
-                    if (!req.is('application/json')) {
-                        return next(
-                            new errors.InvalidContentError("Expects 'application/json'")
-                        );
-                    }
-                    try {
-                        action[verb](filePath, req.body)
+
+            if (responder) {
+                switch(verb) {
+                    case 'del': 
+                        key in req.params
+                        && responder({filePath, req, key})
                         && res.send(204);
-                    } catch(e) {
-                        console.log(e);
-                    }
-                    res.send(404);
-                    break;
-                default: break;
+                        break;
+                    case 'get': 
+                        res.send(200, action.get({filePath, req, ep}));
+                        break;
+                    case 'head':
+                        responder({filePath, res, req, key});
+                        res.send(200);
+                        break;
+                    case 'post': // create
+                        if (!req.is('application/json')) {
+                            return next(
+                                new errors.InvalidContentError("Expects 'application/json'")
+                            );
+                        }
+                        responder({filePath, req, key}) ? res.send(204) : res.send(404);
+                        break;
+                    case 'put': // update
+                        if (!req.is('application/json')) {
+                            return next(
+                                new errors.InvalidContentError("Expects 'application/json'")
+                            );
+                        }
+                        responder({filePath, req, key}) ? res.send(204) : res.send(404);
+                        break;
+                    default: break;
+                }
             }
             return next();
         };
-
-
 
 class Server {
     constructor () {
@@ -137,12 +179,10 @@ class Server {
 
         return this;
     }
-
     start ({port, host, folder, endpoints, malta}) {
         if (this.started) return;
         this.malta = malta;
         this.init(port, host, folder);
-
         try{
             fs.readFile(path.resolve(folder, endpoints), 'utf8', (err, data) => {
                 if (err) this.malta.log_err('Error reading endpoint file');
@@ -155,9 +195,13 @@ class Server {
                      * 
                      */
                     eps[verb].forEach(ep => {
-                        const fpath = path.resolve(folder, ep.source);
+                        const fpath = path.join(folder, ep.source);
                         try {
-                            this.srv[verb]({path : ep.key ? ep.ep.replace(/\:id/, `:${ep.key}`) : ep.ep} , getResponder(verb, fpath, ep));
+                            this.srv[verb]({
+                                    path : ep.ep.replace(/\:id/, `:${ep.key}`)
+                                },
+                                getResponder(verb, fpath, ep)
+                            );
                         } catch(e) {
                             this.malta.log_err('Error' ,e);
                         }
