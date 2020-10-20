@@ -17,16 +17,15 @@ It starts a really raw simple http server, parameters:
 
 
 
-So for example if we want to start it automatically at (first) build, using _public_ as webRoot, with a specific ip on a specific port:  
-```
+So for example if we want to start it automatically at (first) build, using _public_ as webRoot, with a specific ip on a specific port;
+the _entrypoints_ folder must be relative to _folder_, which if not specified is the execution one; all paths must be relative to th default or specified _folder_
+``` sh
 > malta source/index.js public -plugins=malta-restify[endpoints:\"source/restify.json\"]
 ```
 or in the .json file :
-```
+``` json
 {
-    ...,
     "source/index.js": ". -plugins=malta-restify[endpoints:'source/restify.json']"
-    ...
 }
 ```
 
@@ -79,3 +78,11 @@ where the `source` referenced file has to be relative to the current execution f
 The only thing one needs to take care of when referencing a specific element for example in the case of the `GET /person/:id` is that 
 here the `key` value must be present inside the _persons.json_ file since will be used for retriving
 the specific object (or to delete it, check the first DEL rule)
+
+---
+### Another small example
+
+an additional option is available from version **1.0.6**
+- authorization 
+
+when specified, every request must include a header surprisingly named _authorization_ with the exact value passed to the plugin; in case it does not match will receive back a 401 http code (unauthorized).

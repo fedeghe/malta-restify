@@ -98,10 +98,18 @@ const requireUncached = requiredModule => {
             return requireUncached(filePath);
         }
     },
-    getResponder = (verb, filePath, ep) =>
+    getResponder = (verb, filePath, ep, authorization) =>
         (req, res , next) => {
             const key = ep.key || 'id',
                 responder = action[verb];
+
+
+            if (authorization) {
+                if (!('authorization' in req.headers) || req.headers.authorization !== authorization) {
+                    res.send(401);
+                    return next();
+                }
+            }
 
             res.setHeader('Access-Control-Allow-Origin','*');
             res.setHeader('Server','malta-restify');
@@ -150,9 +158,10 @@ class Server {
         this.started = false;
         this.malta = null;
     }
-    init (port, host, folder) {
+    init (port, host, folder, authorization) {
         this.started = true;
-        this.malta.log_info(`> ${this.name.blue()} started on port # ${port} (http://${host}:${port})`);
+        this.authorization = authorization;
+        this.malta.log_info(`> ${this.name.blue()} started on port # ${port} (http://${host}:${port})${authorization ? (' with autorization token \`' + authorization + '\`'):''}`);
         this.malta.log_info(`> webroot is ${folder}`.blue());
         this.dir = process.cwd();
 
@@ -179,10 +188,10 @@ class Server {
 
         return this;
     }
-    start ({port, host, folder, endpoints, malta}) {
+    start ({port, host, folder, endpoints, authorization, malta}) {
         if (this.started) return;
         this.malta = malta;
-        this.init(port, host, folder);
+        this.init(port, host, folder, authorization);
         try{
             fs.readFile(path.resolve(folder, endpoints), 'utf8', (err, data) => {
                 if (err) this.malta.log_err('Error reading endpoint file');
@@ -200,7 +209,7 @@ class Server {
                             this.srv[verb]({
                                     path : ep.ep.replace(/\:id/, `:${ep.key}`)
                                 },
-                                getResponder(verb, fpath, ep)
+                                getResponder(verb, fpath, ep, authorization)
                             );
                         } catch(e) {
                             this.malta.log_err('Error' ,e);
