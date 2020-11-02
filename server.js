@@ -95,10 +95,29 @@ const requireUncached = requiredModule => {
                 let set = r.filter(e => e[k] == req.params[k]);
                 return set.length > 1 ? set : set[0] || []
             }
-            return requireUncached(filePath);
+            return r;
         }
     },
-    getResponder = (verb, filePath, ep, authorization) =>
+    getConsumer = ({verb, ep, authorization, delay, handlers}) =>
+        (req, res , next) => {
+            res.setHeader('Access-Control-Allow-Origin','*');
+            res.setHeader('Server','malta-restify');
+            if (authorization) {
+                if (!('authorization' in req.headers) || req.headers.authorization !== authorization) {
+                    res.send(401);
+                    return next();
+                }
+            }
+
+            if (ep.handler in handlers) {
+                setTimeout(
+                    () => handlers[ep.handler]({req,res, verb, ep, delay}),
+                    delay
+                );
+            }
+            return next();
+        };
+    getResponder = ({verb, filePath, ep, authorization, delay}) =>
         (req, res , next) => {
             const key = ep.key || 'id',
                 responder = action[verb];
@@ -113,40 +132,41 @@ const requireUncached = requiredModule => {
 
             res.setHeader('Access-Control-Allow-Origin','*');
             res.setHeader('Server','malta-restify');
-
-            if (responder) {
-                switch(verb) {
-                    case 'del': 
-                        key in req.params
-                        && responder({filePath, req, key})
-                        && res.send(204);
-                        break;
-                    case 'get': 
-                        res.send(200, action.get({filePath, req, ep}));
-                        break;
-                    case 'head':
-                        responder({filePath, res, req, key});
-                        res.send(200);
-                        break;
-                    case 'post': // create
-                        if (!req.is('application/json')) {
-                            return next(
-                                new errors.InvalidContentError("Expects 'application/json'")
-                            );
-                        }
-                        responder({filePath, req, key}) ? res.send(204) : res.send(404);
-                        break;
-                    case 'put': // update
-                        if (!req.is('application/json')) {
-                            return next(
-                                new errors.InvalidContentError("Expects 'application/json'")
-                            );
-                        }
-                        responder({filePath, req, key}) ? res.send(204) : res.send(404);
-                        break;
-                    default: break;
+            setTimeout(() => {
+                if (responder) {
+                    switch(verb) {
+                        case 'del': 
+                            key in req.params
+                            && responder({filePath, req, key})
+                            && res.send(204);
+                            break;
+                        case 'get': 
+                            res.send(200, action.get({filePath, req, ep}));
+                            break;
+                        case 'head':
+                            responder({filePath, res, req, key});
+                            res.send(200);
+                            break;
+                        case 'post': // create
+                            if (!req.is('application/json')) {
+                                return next(
+                                    new errors.InvalidContentError("Expects 'application/json'")
+                                );
+                            }
+                            responder({filePath, req, key}) ? res.send(204) : res.send(404);
+                            break;
+                        case 'put': // update
+                            if (!req.is('application/json')) {
+                                return next(
+                                    new errors.InvalidContentError("Expects 'application/json'")
+                                );
+                            }
+                            responder({filePath, req, key}) ? res.send(204) : res.send(404);
+                            break;
+                        default: break;
+                    }
                 }
-            }
+            }, delay)
             return next();
         };
 
@@ -157,11 +177,16 @@ class Server {
         this.name = path.basename(path.dirname(__filename));
         this.started = false;
         this.malta = null;
+        this.handlers = {};
     }
-    init (port, host, folder, authorization) {
+    init ({port, host, folder, authorization, delay, handlers}) {
         this.started = true;
         this.authorization = authorization;
-        this.malta.log_info(`> ${this.name.blue()} started on port # ${port} (http://${host}:${port})${authorization ? (' with autorization token \`' + authorization + '\`'):''}`);
+        this.delay = delay;
+        this.malta.log_info(`> ${this.name.blue()} started on port # ${port} (http://${host}:${port})`);
+        authorization && this.malta.log_info(`  with authorization token \`${authorization}\``);
+        delay && this.malta.log_info(`  with delaying time \`${delay}\``);
+        handlers && this.malta.log_info(`  with extra handlers \`${handlers}\``);
         this.malta.log_info(`> webroot is ${folder}`.blue());
         this.dir = process.cwd();
 
@@ -188,14 +213,19 @@ class Server {
 
         return this;
     }
-    start ({port, host, folder, endpoints, authorization, malta}) {
+    start ({port, host, folder, endpoints, authorization, delay, handlers, malta}) {
         if (this.started) return;
         this.malta = malta;
-        this.init(port, host, folder, authorization);
+        this.init({port, host, folder, delay, authorization, handlers});
+        if (handlers) {
+            this.handlers = requireUncached(handlers)
+        }
         try{
+            
             fs.readFile(path.resolve(folder, endpoints), 'utf8', (err, data) => {
                 if (err) this.malta.log_err('Error reading endpoint file');
                 const eps = JSON.parse(data);
+                
                 Object.keys(eps).forEach(verb => {
                     /**
                      * 
@@ -203,13 +233,21 @@ class Server {
                      * del, get, head, opts, post, put, and patch
                      * 
                      */
+                    
                     eps[verb].forEach(ep => {
-                        const fpath = path.join(folder, ep.source);
                         try {
+                            let reqHandler
+                            if ('handler' in ep && ep.handler in this.handlers) {
+                                reqHandler = getConsumer({handlers: this.handlers, verb, ep, authorization, delay});
+                            } else {
+                                let fpath = path.join(folder, ep.source);
+                                reqHandler = getResponder({verb, fpath, ep, authorization, delay});
+                            }
+
                             this.srv[verb]({
                                     path : ep.ep.replace(/\:id/, `:${ep.key}`)
                                 },
-                                getResponder(verb, fpath, ep, authorization)
+                                reqHandler
                             );
                         } catch(e) {
                             this.malta.log_err('Error' ,e);

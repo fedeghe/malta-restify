@@ -9,11 +9,18 @@ function malta_restify(obj, options = {}) {
         folder = path.resolve(process.cwd(), options.folder || './'),
         host = options.host || '127.0.0.1',
         port = options.port || 3001,
+        delay = options.delay ? ~~options.delay : 0,
         authorization = options.authorization || false,
+        handlers = options.handlers ? path.resolve(process.cwd(), options.handlers) : false,
         endpoints = options.endpoints;
     let msg;
 
-    server.start({port, host, folder, endpoints, authorization, malta: self});
+    server.start({
+        port, host, folder, delay,
+        endpoints, authorization,
+        handlers,
+        malta: self
+    });
     return (solve, reject) => {
         solve(obj);
         self.notifyAndUnlock(start, msg);
