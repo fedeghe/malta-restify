@@ -38,7 +38,7 @@ const requireUncached = requiredModule => {
                     .filter(d => d[key] != req.params[key])
                 fs.writeFileSync(filePath, beautifyJson(data))
                 return true;
-            } catch(e) {
+            } catch (e) {
                 console.log(e)
                 return false;
             }
@@ -60,7 +60,7 @@ const requireUncached = requiredModule => {
                     }, [])
                 fs.writeFileSync(filePath, beautifyJson(data))
                 return true;
-            } catch(e) {
+            } catch (e) {
                 console.log(e)
                 return false;
             }
@@ -89,13 +89,8 @@ const requireUncached = requiredModule => {
             res.setHeader('content-type', 'application/json');
         },
         get: ({req, filePath, ep}) => {
-            console.log(ep)
-            
-            console.log(filePath)
-
             const r = requireUncached(filePath),
                 k = ep.key || 'id';
-            console.log(r)
             if (k in req.params) {
                 let set = r.filter(e => e[k] == req.params[k]);
                 return set.length > 1 ? set : set[0] || []
@@ -254,7 +249,7 @@ class Server {
                                 },
                                 reqHandler
                             );
-                        } catch(e) {
+                        } catch (e) {
                             this.malta.log_err('Error' ,e);
                         }
                     })
@@ -264,7 +259,7 @@ class Server {
                 });
                 this.malta.log_info('- start server');
             });
-        }catch(e) {
+        } catch (e) {
             malta.log_err(e);
         }    
     }
