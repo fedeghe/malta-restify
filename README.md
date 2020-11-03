@@ -13,8 +13,8 @@ It starts a really raw simple http server, parameters:
 - entrypoints (mandatory)  
 - port [3001]
 - host [127.0.0.1]
-- folder [execution one, if given must be relative to it] (from v. 1.1.0)
-- delay, in millisecond to delay the response (from v. 1.1.0) [default 0]
+- folder [execution one, if given must be relative to it] (from v. 1.1.2)
+- delay, in millisecond to delay the response (from v. 1.1.2) [default 0]
 - handlers, the path (relative to execution) where oen or more named handlers are exported  
 
 
@@ -90,7 +90,7 @@ an additional option is available from version **1.0.6**
 when specified, every request must include a header surprisingly named _authorization_ with the exact value passed to the plugin; in case it does not match will receive back a 401 http code (unauthorized).
 
 ---
-### Your handlers ( from v 1.1.0 )
+### Your handlers ( from v 1.1.2 )
 Could be useful to be able to setup simple handlers to fulfill some requests; to do that, first create a file fo the special handlers, for example: 
 ``` js
 const users = require('./users.json')
