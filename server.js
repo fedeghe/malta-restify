@@ -89,8 +89,13 @@ const requireUncached = requiredModule => {
             res.setHeader('content-type', 'application/json');
         },
         get: ({req, filePath, ep}) => {
+            console.log(ep)
+            
+            console.log(filePath)
+
             const r = requireUncached(filePath),
                 k = ep.key || 'id';
+            console.log(r)
             if (k in req.params) {
                 let set = r.filter(e => e[k] == req.params[k]);
                 return set.length > 1 ? set : set[0] || []
@@ -240,8 +245,8 @@ class Server {
                             if ('handler' in ep && ep.handler in this.handlers) {
                                 reqHandler = getConsumer({handlers: this.handlers, verb, ep, authorization, delay});
                             } else {
-                                let fpath = path.join(folder, ep.source);
-                                reqHandler = getResponder({verb, fpath, ep, authorization, delay});
+                                let filePath = path.join(folder, ep.source);
+                                reqHandler = getResponder({verb, filePath, ep, authorization, delay});
                             }
 
                             this.srv[verb]({
