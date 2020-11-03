@@ -13,7 +13,7 @@ It starts a really raw simple http server, parameters:
 - entrypoints (mandatory)  
 - port [3001]
 - host [127.0.0.1]
-- folder [execution one, if given must be relative to it]
+- folder [execution one, if given must be relative to it] (from v. 1.1.0)
 - delay, in millisecond to delay the response (from v. 1.1.0) [default 0]
 - handlers, the path (relative to execution) where oen or more named handlers are exported  
 

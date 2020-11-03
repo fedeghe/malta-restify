@@ -3,7 +3,7 @@ const fs = require('fs'),
     restify = require('restify'),
     errors = require('restify-errors'),
     corsMiddleware = require('restify-cors-middleware'),
-    plugins = require('restify-plugins'),
+    plugins = restyfy.plugins,
     restifyBodyParser = plugins.bodyParser,
     cors = corsMiddleware({
         preflightMaxAge: 5,
