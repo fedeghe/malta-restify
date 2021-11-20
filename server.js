@@ -12,13 +12,14 @@ const fs = require('fs'),
 
 let srv;
 
+let uniqTpl = 'ID_<uniq>';
 const uniqueID = new function() {
     let count = +new Date;
-    const self = this;
-    this.prefix = 'ID_';
     this.toString = function() {
         count += 1;
-        return self.prefix + count;
+        return uniqTpl.match(/\<uniq\>/) ?
+            uniqTpl.replace(/\<uniq\>/, count) :
+            `${uniqTpl}-${count}`
     };
 }
 
@@ -30,8 +31,8 @@ const requireUncached = requiredModule => {
         const ret = require(path.resolve(requiredModule))
         return ret || []
     },
-    beautifyJson = json => JSON.stringify(json, null, 2)
-action = {
+    beautifyJson = json => JSON.stringify(json, null, 2),
+    action = {
         del: ({
             filePath,
             req,
@@ -128,8 +129,7 @@ action = {
         ep,
         authorization,
         handlers
-    }) =>
-    (req, res, next) => {
+    }) => (req, res, next) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Server', 'malta-restify');
         if (authorization) {
@@ -148,14 +148,13 @@ action = {
             });
         }
         return next();
-    };
-getResponder = ({
+    },
+    getResponder = ({
         verb,
         filePath,
         ep,
         authorization
-    }) =>
-    (req, res, next) => {
+    }) => (req, res, next) => {
         const key = ep.key || 'id',
             responder = action[verb];
 
@@ -197,17 +196,6 @@ getResponder = ({
                     res.send(200);
                     break;
                 case 'post': // create
-                    if (!req.is('application/json')) {
-                        return next(
-                            new errors.InvalidContentError("Expects 'application/json'")
-                        );
-                    }
-                    responder({
-                        filePath,
-                        req,
-                        key
-                    }) ? res.send(204) : res.send(404);
-                    break;
                 case 'put': // update
                     if (!req.is('application/json')) {
                         return next(
@@ -241,7 +229,8 @@ class Server {
         host,
         folder,
         authorization,
-        handlers
+        handlers,
+        delay
     }) {
         this.started = true;
         this.authorization = authorization;
@@ -269,7 +258,7 @@ class Server {
                     route.spec.path.replace(/\:([A-Za-z]*)/, ($1, $2) =>
                         $2 in req.params ? req.params[$2] : $2
                     ),
-                    `(took ${+new Date - req.time()}ms)`
+                    `(took ${+new Date - req.time() - delay}ms + ${delay}ms delay)`
                 ].join(' '));
             }
         });
@@ -283,8 +272,11 @@ class Server {
         endpoints,
         authorization,
         handlers,
+        delay,
+        idTpl,
         malta
     }) {
+        const self = this;
         if (this.started) return;
         this.malta = malta;
         this.init({
@@ -292,7 +284,8 @@ class Server {
             host,
             folder,
             authorization,
-            handlers
+            handlers,
+            delay
         });
         if (handlers) {
             this.handlers = requireUncached(handlers)
@@ -301,46 +294,43 @@ class Server {
 
             fs.readFile(path.resolve(folder, endpoints), 'utf8', (err, data) => {
                 if (err) this.malta.log_err('Error reading endpoint file');
-                const eps = JSON.parse(data);
+                const endpoints = JSON.parse(data);
 
-                Object.keys(eps).forEach(verb => {
-                    /**
-                     * 
-                     * Verbs here are 
-                     * del, get, head, opts, post, put, and patch
-                     * 
-                     */
+                if (idTpl) uniqTpl = idTpl;
 
-                    eps[verb].forEach(ep => {
+                Object.keys(endpoints).forEach(verb =>
+                    endpoints[verb].forEach(ep => {
                         try {
-                            let reqHandler
-                            if ('handler' in ep && ep.handler in this.handlers) {
-                                reqHandler = getConsumer({
-                                    handlers: this.handlers,
-                                    verb,
-                                    ep,
-                                    authorization,
-                                });
-                            } else {
-                                let filePath = path.join(folder, ep.source);
-                                reqHandler = getResponder({
-                                    verb,
-                                    filePath,
-                                    ep,
-                                    authorization,
-                                });
-                            }
 
-                            this.srv[verb]({
+                            const base = {
+                                    verb,
+                                    ep,
+                                    authorization,
+                                },
+                                reqHandler = ('handler' in ep && ep.handler in this.handlers) ?
+                                getConsumer({
+                                    handlers: this.handlers,
+                                    ...base,
+                                }) :
+                                getResponder({
+                                    filePath: path.join(folder, ep.source),
+                                    ...base
+                                });
+
+                            self.srv[verb]({
                                     path: ep.ep.replace(/\:id/, `:${ep.key}`)
                                 },
-                                reqHandler
-                            );
+                                // first delay
+                                (req, res, next) => new Promise(
+                                    solve => setTimeout(solve, delay)
+                                ).then(() => reqHandler(req, res, next))
+                            )
+
                         } catch (e) {
                             this.malta.log_err('Error', e);
                         }
                     })
-                })
+                )
                 this.srv.listen(port, host, () => {
                     this.malta.log_info(`- ${this.srv.name} listening at ${this.srv.url}`);
                 });

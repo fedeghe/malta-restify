@@ -14,14 +14,15 @@ It starts a really raw simple http server, parameters:
 - port [3001]
 - host [127.0.0.1]
 - folder [execution one, if given must be relative to it] (from v. 1.1.3)
-- handlers, the path (relative to execution) where oen or more named handlers are exported  
-
+- delay, in millisecond to delay the response (from v. 1.1.6) [default 0]
+- handlers, the path (relative to execution) where one or more named handlers are exported  
+- idTpl: a string that contains `<uniq>` that will be used to create the _id_ value of new elements created using POST; default is `ID_<a uniq number>`
 
 
 So for example if we want to start it automatically at (first) build, using _public_ as webRoot, with a specific ip on a specific port;
 the _entrypoints_ folder must be relative to _folder_, which if not specified is the execution one; all paths must be relative to th default or specified _folder_
 ``` sh
-> malta source/index.js public -plugins=malta-restify[endpoints:\"source/restify.json\"]
+> malta source/index.js public -plugins=malta-restify[endpoints:\"source/restify.json\",post:3452,delay:1e3]
 ```
 or in the .json file :
 ``` json
