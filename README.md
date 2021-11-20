@@ -14,7 +14,6 @@ It starts a really raw simple http server, parameters:
 - port [3001]
 - host [127.0.0.1]
 - folder [execution one, if given must be relative to it] (from v. 1.1.3)
-- delay, in millisecond to delay the response (from v. 1.1.3) [default 0]
 - handlers, the path (relative to execution) where oen or more named handlers are exported  
 
 
