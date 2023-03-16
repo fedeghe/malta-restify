@@ -10,19 +10,40 @@ This plugin can be started on any file
 `> yarn add malta-restify`  
 
 It starts a really raw simple http server, parameters:
-- entrypoints (mandatory)  
-- port [3001]
-- host [127.0.0.1]
-- folder [execution one, if given must be relative to it] (from v. 1.1.3)
-- delay, in millisecond to delay the response (from v. 1.1.6) [default 0]
-- handlers, the path (relative to execution) where one or more named handlers are exported  
-- idTpl: a string that contains `<uniq>` that will be used to create the _id_ value of new elements created using POST; default is `ID_<a uniq number>`
+- **endpoints**  
+    grouped per HTTP verb the list of endpoints, the minimum setting for one endpoint follows:
+    ``` json
+    {
+        "GET": [{
+            "ep": "/users", 
+            "source": ".data/users.json"
+        }]
+    }
+    ```
+    when for GET, DELETE, PATCH or PUT a parameter is required it becomes: 
+    ``` json
+    {
+        "DELETE": [{
+            "ep": "/users/:id", 
+            "source": ".data/users.json",
+            "key": "id"
+        }]
+    }
+    ```
+    Notice: `CONNECT`, `OPTIONS` and `TRACE` are not supported
+- _port_: default is 3001 (u need to use root to start on ports < 1024)
+- _host_: default IP is 127.0.0.1
+- _folder_: the path relative to execution where files targeted in `endpoints` are reachable; default is _malta_execution folder.  
+- _delay_: in millisecond to delay the response [default 0]
+- _handlers_: the path (relative to execution) where one or more named handlers are exported; default is _malta_execution folder
+- _idTpl_: a string that contains `<uniq>` that will be used to create the _id_ value of new elements created using POST; default is `ID_<uniq>`  
+- authorization: string - when specified will require every request to send this in an _authorization_ header.
 
 
 So for example if we want to start it automatically at (first) build, using _public_ as webRoot, with a specific ip on a specific port;
 the _entrypoints_ folder must be relative to _folder_, which if not specified is the execution one; all paths must be relative to th default or specified _folder_
 ``` sh
-> malta source/index.js public -plugins=malta-restify[endpoints:\"source/restify.json\",post:3452,delay:1e3]
+> malta source/index.js public -plugins=malta-restify[endpoints:\"source/restify.json\",port:3452,delay:1e3]
 ```
 or in the .json file :
 ``` json
@@ -37,20 +58,20 @@ the entrypoints have the following structure (in the example _source/restify.jso
 
 ``` json
 {
-    "del": [
+    "DELETE": [
         {
             "ep": "/person/:id",
             "source": "./source/data/persons.json",
             "key": "id"
         }
     ],
-    "post": [
+    "POST": [
         {
             "ep": "/persons",
             "source": "./source/data/persons.json"
         }
     ],
-    "get": [
+    "GET": [
         {
             "ep": "/persons",
             "source": "source/data/persons.json"
@@ -62,7 +83,9 @@ the entrypoints have the following structure (in the example _source/restify.jso
         }   
     ]
 }
-/// and persons.json could be  something like
+```
+and `persons.json` could be something like: 
+``` json
 [
     {
         "id": 1,
@@ -108,7 +131,7 @@ then save ti and pass the **path** as the `handlers` parameter to Malta.
 
 Now the only missin thing is to add the indicatioj   in the `restify.json` file, for example:
 ``` json
-"get": [
+"GET": [
     {
         "ep": "/checkcredentials",
         "handler": "checkCredentials", // the name must match
