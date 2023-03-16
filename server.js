@@ -10,18 +10,37 @@ const fs = require('fs'),
         origins: ['*']
     });
 
-let srv;
+let srv,
+    uniqTpl = 'ID_<uniq>';
 
-let uniqTpl = 'ID_<uniq>';
-const uniqueID = new function() {
-    let count = +new Date;
-    this.toString = function() {
-        count += 1;
-        return uniqTpl.match(/\<uniq\>/) ?
-            uniqTpl.replace(/\<uniq\>/, count) :
-            `${uniqTpl}-${count}`
-    };
-}
+const verbMap = {
+        DELETE: 'del',
+        GET: 'get',
+        PATCH: 'patch',
+        PUT: 'put',
+        POST: 'post',
+        HEAD: 'head',
+    },
+    codes = {
+        ok: 200,
+        created: 201,
+        noContent: 204,
+        badReq: 400,
+        unAuth: 401,
+        notFound: 404,
+        notAllowedMethod: 405,
+        error: 500
+    },
+    uniqueID = new function() {
+        let count = +new Date;
+        this.toString = function() {
+            count += 1;
+            return uniqTpl.match(/\<uniq\>/) ?
+                uniqTpl.replace(/\<uniq\>/, count) :
+                `${uniqTpl}-${count}`
+        };
+    },
+    sslPort = 443;
 
 const requireUncached = requiredModule => {
         const mod = require.resolve(path.resolve(requiredModule))
@@ -32,24 +51,32 @@ const requireUncached = requiredModule => {
         return ret || []
     },
     beautifyJson = json => JSON.stringify(json, null, 2),
+
     action = {
-        del: ({
+        // updateas it is  can be used for PUT and PATCH
+        put: ({
             filePath,
             req,
             key
         }) => {
+            const payload = req.body;
+
             try {
-                const data = requireUncached(filePath)
-                    .filter(d => d[key] != req.params[key])
-                fs.writeFileSync(filePath, beautifyJson(data))
-                return true;
+                const prev = requireUncached(filePath)
+                const next = prev.filter(el => req.params[key] !== el[key])
+                if (prev.length !== next.length){
+                    next.push({...payload,
+                        [key]: `${uniqueID}`
+                    });
+                    fs.writeFileSync(filePath, beautifyJson(next))
+                }
+                return codes.noContent;
             } catch (e) {
-                console.log(e)
-                return false;
+                console.log({Error: e})
+                return codes.notFound;
             }
         },
-        //update
-        put: ({
+        patch: ({
             filePath,
             req,
             key
@@ -62,18 +89,39 @@ const requireUncached = requiredModule => {
                             // do not reset others with
                             // el = {[k]: el[k]}
                             // could be an idea to make it optional with req.params.clean
-                            for (let f in payload) el[f] = payload[f];
+                            for (let f in payload) {
+                                //but not override the key
+                                if (f !== key) {
+                                    el[f] = payload[f];
+                                }
+                            }
                         }
                         acc.push(el)
                         return acc
                     }, [])
                 fs.writeFileSync(filePath, beautifyJson(data))
-                return true;
+                return codes.noContent;
             } catch (e) {
-                console.log(e)
-                return false;
+                console.log({Error: e})
+                return codes.notFound;
             }
         },
+        del: ({
+            filePath,
+            req,
+            key
+        }) => {
+            try {
+                const data = requireUncached(filePath)
+                    .filter(d => d[key] != req.params[key])
+                fs.writeFileSync(filePath, beautifyJson(data))
+                return codes.noContent;
+            } catch (e) {
+                console.log({Error: e})
+                return codes.error;
+            }
+        },
+        
         // create
         post: ({
             filePath,
@@ -93,10 +141,10 @@ const requireUncached = requiredModule => {
                     })
                 }
                 fs.writeFileSync(filePath, beautifyJson(data))
-                return true;
+                return codes.created;
             } catch (e) {
-                console.log(e)
-                return false;
+                console.log({Error: e})
+                return codes.error;
             }
         },
         head: ({
@@ -109,19 +157,27 @@ const requireUncached = requiredModule => {
                 cnt = key ? content.filter(row => row[key] == req.params[key]) : content;
             res.setHeader('content-length', cnt.toString().length);
             res.setHeader('content-type', 'application/json');
+            return codes.ok
         },
         get: ({
             req,
             filePath,
             ep
         }) => {
-            const r = requireUncached(filePath),
-                k = ep.key || 'id';
-            if (k in req.params) {
-                let set = r.filter(e => e[k] == req.params[k]);
-                return set.length > 1 ? set : set[0] || []
+            try {
+                const r = requireUncached(filePath);
+
+                let k = ep.key || 'id',
+                    set = r;
+
+                if (k in req.params) {
+                    set = r.filter(e => e[k] == req.params[k]);
+                    return {code: codes.ok, res: set[0] || []};
+                }
+                return {code: codes.ok, res: r || []};
+            } catch(e) {
+                return {code: codes.error, res: []}
             }
-            return r;
         }
     },
     getConsumer = ({
@@ -172,41 +228,43 @@ const requireUncached = requiredModule => {
             switch (verb) {
                 case 'del':
                     key in req.params &&
-                        responder({
+                        res.send(responder({
                             filePath,
                             req,
                             key
-                        }) &&
-                        res.send(204);
+                        }))
                     break;
                 case 'get':
-                    res.send(200, action.get({
+                    const r = responder({
                         filePath,
                         req,
                         ep
-                    }));
+                    });
+                    res.send(r.code, r.res); 
                     break;
                 case 'head':
-                    responder({
+                    res.send(responder({
                         filePath,
                         res,
                         req,
                         key
-                    });
-                    res.send(200);
+                    }));
                     break;
                 case 'post': // create
                 case 'put': // update
+                case 'patch': // update
                     if (!req.is('application/json')) {
                         return next(
                             new errors.InvalidContentError("Expects 'application/json'")
                         );
                     }
-                    responder({
-                        filePath,
-                        req,
-                        key
-                    }) ? res.send(204) : res.send(404);
+                    res.send(
+                        responder({
+                            filePath,
+                            req,
+                            key
+                        })
+                    );
                     break;
                 default:
                     break;
@@ -216,13 +274,14 @@ const requireUncached = requiredModule => {
     };
 
 class Server {
-    constructor() {
+    constructor(sslOpts = {}) {
         this.srv = null;
         this.dir = null;
         this.name = path.basename(path.dirname(__filename));
         this.started = false;
         this.malta = null;
         this.handlers = {};
+        this.sslOpts = sslOpts
     }
     init({
         port,
@@ -240,9 +299,17 @@ class Server {
         this.malta.log_info(`> webroot is ${folder}`.blue());
         this.dir = process.cwd();
 
-        this.srv = restify.createServer({
-            name: 'malta-restify'
-        });
+        if (this.sslOpts.ssl) {
+            this.srv = restify.createServer({
+                name: 'malta-restify-ssl',
+                key: fs.readFileSync(this.sslOpts.sslKeyPath),
+                certificate: fs.readFileSync(this.sslOpts.sslCrtPath)
+            });
+        } else {
+            this.srv = restify.createServer({
+                name: 'malta-restify'
+            });
+        }
 
         this.srv.pre(cors.preflight);
         this.srv.pre(restify.plugins.pre.dedupeSlashes());
@@ -300,31 +367,30 @@ class Server {
 
                 Object.keys(endpoints).forEach(verb =>
                     endpoints[verb].forEach(ep => {
+                        const mappedVerb = verbMap[verb];
                         try {
-
                             const base = {
-                                    verb,
+                                    verb: mappedVerb,
                                     ep,
                                     authorization,
                                 },
-                                reqHandler = ('handler' in ep && ep.handler in this.handlers) ?
-                                getConsumer({
-                                    handlers: this.handlers,
-                                    ...base,
-                                }) :
-                                getResponder({
-                                    filePath: path.join(folder, ep.source),
-                                    ...base
-                                });
-
-                            self.srv[verb]({
-                                    path: ep.ep.replace(/\:id/, `:${ep.key}`)
+                                reqHandler = ('handler' in ep && ep.handler in this.handlers)
+                                    ? getConsumer({
+                                        handlers: this.handlers,
+                                        ...base,
+                                    })
+                                    : getResponder({
+                                        filePath: path.join(folder, ep.source),
+                                        ...base
+                                    });
+                            self.srv[mappedVerb]({
+                                    path: ep.path.replace(/\:id/, `:${ep.key}`)
                                 },
                                 // first delay
                                 (req, res, next) => new Promise(
                                     solve => setTimeout(solve, delay)
                                 ).then(() => reqHandler(req, res, next))
-                            )
+                            );
 
                         } catch (e) {
                             this.malta.log_err('Error', e);
@@ -342,9 +408,9 @@ class Server {
     }
 }
 module.exports = {
-    getServer: () => {
+    getServer: (sslOpts) => {
         if (!srv) {
-            srv = new Server();
+            srv = new Server(sslOpts);
         }
         return srv;
     }
