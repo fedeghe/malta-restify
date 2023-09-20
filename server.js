@@ -21,15 +21,15 @@ const verbMap = {
         POST: 'post',
         HEAD: 'head',
     },
-    codes = {
-        ok: 200,
-        created: 201,
-        noContent: 204,
-        badReq: 400,
-        unAuth: 401,
-        notFound: 404,
-        notAllowedMethod: 405,
-        error: 500
+    CODES = {
+        OK: 200,
+        CREATED: 201,
+        NO_CONTENT: 204,
+        BAD_REQUEST: 400,
+        UNAUTHORIZED: 401,
+        NOT_FOUND: 404,
+        NOT_ALLOWED_METHOD: 405,
+        ERROR: 500
     },
     uniqueID = new function() {
         let count = +new Date;
@@ -70,10 +70,10 @@ const requireUncached = requiredModule => {
                     });
                     fs.writeFileSync(filePath, beautifyJson(next))
                 }
-                return codes.noContent;
+                return CODES.NO_CONTENT;
             } catch (e) {
                 console.log({Error: e})
-                return codes.notFound;
+                return CODES.NOT_FOUND;
             }
         },
         patch: ({
@@ -100,10 +100,10 @@ const requireUncached = requiredModule => {
                         return acc
                     }, [])
                 fs.writeFileSync(filePath, beautifyJson(data))
-                return codes.noContent;
+                return CODES.NO_CONTENT;
             } catch (e) {
                 console.log({Error: e})
-                return codes.notFound;
+                return CODES.NOT_FOUND;
             }
         },
         del: ({
@@ -115,10 +115,10 @@ const requireUncached = requiredModule => {
                 const data = requireUncached(filePath)
                     .filter(d => d[key] != req.params[key])
                 fs.writeFileSync(filePath, beautifyJson(data))
-                return codes.noContent;
+                return CODES.NO_CONTENT;
             } catch (e) {
                 console.log({Error: e})
-                return codes.error;
+                return CODES.ERROR;
             }
         },
         
@@ -141,10 +141,10 @@ const requireUncached = requiredModule => {
                     })
                 }
                 fs.writeFileSync(filePath, beautifyJson(data))
-                return codes.created;
+                return CODES.CREATED;
             } catch (e) {
                 console.log({Error: e})
-                return codes.error;
+                return CODES.ERROR;
             }
         },
         head: ({
@@ -157,32 +157,31 @@ const requireUncached = requiredModule => {
                 cnt = key ? content.filter(row => row[key] == req.params[key]) : content;
             res.setHeader('content-length', cnt.toString().length);
             res.setHeader('content-type', 'application/json');
-            return codes.ok
+            return CODES.OK
         },
         get: ({
             req,
             filePath,
-            ep
+            endpoint
         }) => {
             try {
                 const r = requireUncached(filePath);
-
-                let k = ep.key || 'id',
+                let k = endpoint.key || 'id',
                     set = r;
 
                 if (k in req.params) {
                     set = r.filter(e => e[k] == req.params[k]);
-                    return {code: codes.ok, res: set[0] || []};
+                    return {code: CODES.OK, res: set[0] || []};
                 }
-                return {code: codes.ok, res: r || []};
+                return {code: CODES.OK, res: r || []};
             } catch(e) {
-                return {code: codes.error, res: []}
+                return {code: CODES.ERROR, res: []}
             }
         }
     },
     getConsumer = ({
         verb,
-        ep,
+        endpoint,
         authorization,
         handlers
     }) => (req, res, next) => {
@@ -190,34 +189,36 @@ const requireUncached = requiredModule => {
         res.setHeader('Server', 'malta-restify');
         if (authorization) {
             if (!('authorization' in req.headers) || req.headers.authorization !== authorization) {
-                res.send(401);
+                res.send(CODES.UNAUTHORIZED);
                 return next();
             }
         }
 
-        if (ep.handler in handlers) {
-            handlers[ep.handler]({
+        if (endpoint.handler in handlers) {
+            handlers[endpoint.handler]({
                 req,
                 res,
                 verb,
-                ep,
+                endpoint,
             });
+        } else {
+            res.send(CODES.NOT_ALLOWED_METHOD);
         }
         return next();
     },
     getResponder = ({
         verb,
         filePath,
-        ep,
+        endpoint,
         authorization
     }) => (req, res, next) => {
-        const key = ep.key || 'id',
+        const key = endpoint.key || 'id',
             responder = action[verb];
 
 
         if (authorization) {
             if (!('authorization' in req.headers) || req.headers.authorization !== authorization) {
-                res.send(401);
+                res.send(CODES.UNAUTHORIZED);
                 return next();
             }
         }
@@ -238,17 +239,18 @@ const requireUncached = requiredModule => {
                     const r = responder({
                         filePath,
                         req,
-                        ep
+                        endpoint
                     });
                     res.send(r.code, r.res); 
                     break;
                 case 'head':
-                    res.send(responder({
-                        filePath,
-                        res,
-                        req,
-                        key
-                    }));
+                    
+                        res.send(responder({
+                            filePath,
+                            res,
+                            req,
+                            key : key in req.params && key
+                        }));
                     break;
                 case 'post': // create
                 case 'put': // update
@@ -361,30 +363,30 @@ class Server {
 
             fs.readFile(path.resolve(folder, endpoints), 'utf8', (err, data) => {
                 if (err) this.malta.log_err('Error reading endpoint file');
-                const endpoints = JSON.parse(data);
+                const endpointsJson = JSON.parse(data);
 
                 if (idTpl) uniqTpl = idTpl;
 
-                Object.keys(endpoints).forEach(verb =>
-                    endpoints[verb].forEach(ep => {
+                Object.keys(endpointsJson).forEach(verb =>
+                    endpointsJson[verb].forEach(endpoint => {
                         const mappedVerb = verbMap[verb];
                         try {
                             const base = {
                                     verb: mappedVerb,
-                                    ep,
+                                    endpoint,
                                     authorization,
                                 },
-                                reqHandler = ('handler' in ep && ep.handler in this.handlers)
+                                reqHandler = ('handler' in endpoint && endpoint.handler in self.handlers)
                                     ? getConsumer({
-                                        handlers: this.handlers,
+                                        handlers: self.handlers,
                                         ...base,
                                     })
                                     : getResponder({
-                                        filePath: path.join(folder, ep.source),
+                                        filePath: path.join(folder, endpoint.source),
                                         ...base
                                     });
                             self.srv[mappedVerb]({
-                                    path: ep.path.replace(/\:id/, `:${ep.key}`)
+                                    path: endpoint.path.replace(/\:id/, `:${endpoint.key}`)
                                 },
                                 // first delay
                                 (req, res, next) => new Promise(

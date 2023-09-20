@@ -15,8 +15,8 @@ It starts a really raw simple http server, parameters:
     ``` json
     {
         "GET": [{
-            "ep": "/users", 
-            "source": ".data/users.json"
+            "path": "/users", 
+            "source": "data/users.json"
         }]
     }
     ```
@@ -24,8 +24,8 @@ It starts a really raw simple http server, parameters:
     ``` json
     {
         "DELETE": [{
-            "ep": "/users/:id", 
-            "source": ".data/users.json",
+            "path": "/users/:id", 
+            "source": "data/users.json",
             "key": "id"
         }]
     }
@@ -60,24 +60,24 @@ the entrypoints have the following structure (in the example _source/restify.jso
 {
     "DELETE": [
         {
-            "ep": "/person/:id",
+            "path": "/person/:id",
             "source": "./source/data/persons.json",
             "key": "id"
         }
     ],
     "POST": [
         {
-            "ep": "/persons",
+            "path": "/persons",
             "source": "./source/data/persons.json"
         }
     ],
     "GET": [
         {
-            "ep": "/persons",
+            "path": "/persons",
             "source": "source/data/persons.json"
         },
         {
-            "ep": "/person/:id",
+            "path": "/person/:id",
             "source": "source/data/persons.json",
             "key": "id"
         }   
@@ -127,16 +127,16 @@ module.exports = {
     checkCredentials
 }
 ```
-then save ti and pass the **path** as the `handlers` parameter to Malta.
+then save it and pass the **path** as the `handlers` parameter to Malta.
 
-Now the only missin thing is to add the indicatioj   in the `restify.json` file, for example:
+Now the only missing thing is to add to one or more endpoints a `handler` string containing the function name of the needed handler, for example:
 ``` json
 "GET": [
     {
-        "ep": "/checkcredentials",
+        "path": "/checkcredentials",
         "handler": "checkCredentials", // the name must match
         "any": "other",
         "parameter": "here"
     },
 ```
-`ep` and `handler` are mandatory, while all others are optionals and will be passed to to the handler within the `ep` parameter.
+`path` and `handler` are mandatory, while all others are optionals and will be passed to to the handler within the `endpoint`` parameter.
