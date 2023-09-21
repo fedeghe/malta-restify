@@ -33,9 +33,9 @@ It starts a really raw simple http server, parameters:
     Notice: `CONNECT`, `OPTIONS` and `TRACE` are not supported
 - _port_: default is 3001 (u need to use root to start on ports < 1024)
 - _host_: default IP is 127.0.0.1
-- _folder_: the path relative to execution where files targeted in `endpoints` are reachable; default is _malta_execution folder.  
+- _folder_: the path relative to execution where files targeted in `endpoints` are reachable; default is _malta_ execution folder.  
 - _delay_: in millisecond to delay the response [default 0]
-- _handlers_: the path (relative to execution) where one or more named handlers are exported; default is _malta_execution folder
+- _handlers_: the path (relative to execution) where one or more named handlers are exported; default is _malta_ execution folder
 - _idTpl_: a string that contains `<uniq>` that will be used to create the _id_ value of new elements created using POST; default is `ID_<uniq>`  
 - authorization: string - when specified will require every request to send this in an _authorization_ header.
 
