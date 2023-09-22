@@ -52,7 +52,7 @@ const requireUncached = requiredModule => {
     },
     beautifyJson = json => JSON.stringify(json, null, 2),
 
-    action = {
+    fsActions = {
         // updateas it is  can be used for PUT and PATCH
         put: ({
             filePath,
@@ -85,6 +85,7 @@ const requireUncached = requiredModule => {
             try {
                 const data = requireUncached(filePath)
                     .reduce((acc, el) => {
+                        
                         if (el[key] == req.params[key]) {
                             // do not reset others with
                             // el = {[k]: el[k]}
@@ -99,10 +100,11 @@ const requireUncached = requiredModule => {
                         acc.push(el)
                         return acc
                     }, [])
+                
                 fs.writeFileSync(filePath, beautifyJson(data))
                 return CODES.NO_CONTENT;
             } catch (e) {
-                console.log({Error: e})
+                console.info({Error: e})
                 return CODES.NOT_FOUND;
             }
         },
@@ -147,6 +149,7 @@ const requireUncached = requiredModule => {
                 return CODES.ERROR;
             }
         },
+
         head: ({
             filePath,
             res,
@@ -159,6 +162,7 @@ const requireUncached = requiredModule => {
             res.setHeader('content-type', 'application/json');
             return CODES.OK
         },
+
         get: ({
             req,
             filePath,
@@ -193,7 +197,7 @@ const requireUncached = requiredModule => {
                 return next();
             }
         }
-
+        
         if (endpoint.handler in handlers) {
             handlers[endpoint.handler]({
                 req,
@@ -213,9 +217,9 @@ const requireUncached = requiredModule => {
         authorization
     }) => (req, res, next) => {
         const key = endpoint.key || 'id',
-            responder = action[verb];
+            responder = fsActions[verb];
 
-
+        
         if (authorization) {
             if (!('authorization' in req.headers) || req.headers.authorization !== authorization) {
                 res.send(CODES.UNAUTHORIZED);
@@ -244,7 +248,6 @@ const requireUncached = requiredModule => {
                     res.send(r.code, r.res); 
                     break;
                 case 'head':
-                    
                         res.send(responder({
                             filePath,
                             res,
@@ -253,7 +256,7 @@ const requireUncached = requiredModule => {
                         }));
                     break;
                 case 'post': // create
-                case 'put': // update
+                case 'put': // replace full
                 case 'patch': // update
                     if (!req.is('application/json')) {
                         return next(
@@ -271,6 +274,8 @@ const requireUncached = requiredModule => {
                 default:
                     break;
             }
+        } else {
+            res.send(CODES.NOT_ALLOWED_METHOD);
         }
         return next();
     };
@@ -370,12 +375,14 @@ class Server {
                 Object.keys(endpointsJson).forEach(verb =>
                     endpointsJson[verb].forEach(endpoint => {
                         const mappedVerb = verbMap[verb];
+                        
                         try {
                             const base = {
                                     verb: mappedVerb,
                                     endpoint,
                                     authorization,
                                 },
+                                
                                 reqHandler = ('handler' in endpoint && endpoint.handler in self.handlers)
                                     ? getConsumer({
                                         handlers: self.handlers,
@@ -385,10 +392,10 @@ class Server {
                                         filePath: path.join(folder, endpoint.source),
                                         ...base
                                     });
-                            self.srv[mappedVerb]({
-                                    path: endpoint.path.replace(/\:id/, `:${endpoint.key}`)
-                                },
-                                // first delay
+
+                            self.srv[mappedVerb](
+                                endpoint.path.replace(/\:id/, `:${endpoint.key}`),
+                                // first delay, then handle
                                 (req, res, next) => new Promise(
                                     solve => setTimeout(solve, delay)
                                 ).then(() => reqHandler(req, res, next))
