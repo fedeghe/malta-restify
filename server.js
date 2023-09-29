@@ -289,6 +289,7 @@ class Server {
         this.malta = null;
         this.handlers = {};
         this.sslOpts = sslOpts
+        this.verbose = true;
     }
     init({
         port,
@@ -298,6 +299,7 @@ class Server {
         handlers,
         delay
     }) {
+        var self = this;
         this.started = true;
         this.authorization = authorization;
         this.malta.log_info(`> ${this.name.blue()} started on port # ${port} (http://${host}:${port})`);
@@ -326,8 +328,8 @@ class Server {
         this.srv.use(cors.actual);
 
         this.srv.on('after', (req, res, route, error) => {
-            if (!error) {
-                this.malta.log_info([
+            if (!error && self.verbose) {
+                self.malta.log_info([
                     route.spec.method,
                     route.spec.path.replace(/\:([A-Za-z]*)/, ($1, $2) =>
                         $2 in req.params ? req.params[$2] : $2
@@ -348,10 +350,12 @@ class Server {
         handlers,
         delay,
         idTpl,
-        malta
+        malta,
+        verbose
     }) {
         const self = this;
         if (this.started) return;
+        this.verbose = verbose;
         this.malta = malta;
         this.init({
             port,

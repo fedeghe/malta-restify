@@ -12,7 +12,8 @@ function malta_restify(obj, options = {}) {
         delay = ~~options.delay || 0,
         authorization = options.authorization || false,
         handlers = options.handlers ? path.resolve(cwd, options.handlers) : false,
-        endpoints = options.endpoints;
+        endpoints = options.endpoints,
+        verbose = 'verbose' in options ? !!options.verbose : true;
 
     let msg;
 
@@ -26,7 +27,8 @@ function malta_restify(obj, options = {}) {
         handlers,
         delay,
         idTpl,
-        malta: self
+        malta: self,
+        verbose
     });
    
 

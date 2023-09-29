@@ -37,7 +37,8 @@ It starts a really raw simple http server, parameters:
 - _delay_: in millisecond to delay the response [default 0]
 - _handlers_: the path (relative to execution) where one or more named handlers are exported; default is _malta_ execution folder
 - _idTpl_: a string that contains `<uniq>` that will be used to create the _id_ value of new elements created using POST; default is `ID_<uniq>`  
-- authorization: string - when specified will require every request to send this in an _authorization_ header.
+- authorization: string - when specified will require every request to send this in an _authorization_ header.  
+- verbose: boolean - defaulted to `true` allows to shut up the after request notifications when `false`.  
 
 
 So for example if we want to start it automatically at (first) build, using _public_ as webRoot, with a specific ip on a specific port;
