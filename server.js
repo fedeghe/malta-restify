@@ -1,14 +1,8 @@
 const fs = require('fs'),
     path = require('path'),
-    restify = require('restify'),
-    errors = require('restify-errors'),
-    corsMiddleware = require('restify-cors-middleware'),
-    plugins = restify.plugins,
-    restifyBodyParser = plugins.bodyParser,
-    cors = corsMiddleware({
-        preflightMaxAge: 5,
-        origins: ['*']
-    });
+    http = require('http'),
+    https = require('https'),
+    { URL } = require('url');
 
 let srv,
     uniqTpl = 'ID_<uniq>';
@@ -51,6 +45,65 @@ const requireUncached = requiredModule => {
         return ret || []
     },
     beautifyJson = json => JSON.stringify(json, null, 2),
+    compileRoute = routePath => {
+        const names = [];
+        const escaped = routePath
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            .replace(/\\:([A-Za-z_][A-Za-z0-9_]*)/g, (_, name) => {
+                names.push(name);
+                return '([^/]+)';
+            });
+        return {
+            regex: new RegExp(`^${escaped}$`),
+            names
+        };
+    },
+    parseBody = req => new Promise(resolve => {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => {
+            const raw = Buffer.concat(chunks).toString();
+            if (!raw) return resolve({});
+            try {
+                resolve(JSON.parse(raw));
+            } catch (e) {
+                resolve({});
+            }
+        });
+        req.on('error', () => resolve({}));
+    }),
+    applyDefaultHeaders = res => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.setHeader('Server', 'malta-restify');
+    },
+    createResponseWrapper = res => ({
+        setHeader: (key, value) => res.setHeader(key, value),
+        set: headers => Object.keys(headers).forEach(k => res.setHeader(k, headers[k])),
+        sendRaw: (code, payload, headers = {}) => {
+            Object.keys(headers).forEach(k => res.setHeader(k, headers[k]));
+            if (!res.getHeader('content-type')) {
+                res.setHeader('content-type', 'text/plain; charset=utf-8');
+            }
+            res.statusCode = code;
+            res.end(payload);
+        },
+        send: (code, payload, headers = {}) => {
+            Object.keys(headers).forEach(k => res.setHeader(k, headers[k]));
+            res.statusCode = code;
+            if (payload === undefined || payload === null) {
+                return res.end();
+            }
+            if (typeof payload === 'object') {
+                if (!res.getHeader('content-type')) {
+                    res.setHeader('content-type', 'application/json; charset=utf-8');
+                }
+                return res.end(JSON.stringify(payload));
+            }
+            return res.end(String(payload));
+        }
+    }),
 
     fsActions = {
         // updateas it is  can be used for PUT and PATCH
@@ -259,9 +312,10 @@ const requireUncached = requiredModule => {
                 case 'put': // replace full
                 case 'patch': // update
                     if (!req.is('application/json')) {
-                        return next(
-                            new errors.InvalidContentError("Expects 'application/json'")
-                        );
+                        res.send(CODES.BAD_REQUEST, {
+                            error: "Expects 'application/json'"
+                        });
+                        return next();
                     }
                     res.send(
                         responder({
@@ -290,6 +344,7 @@ class Server {
         this.handlers = {};
         this.sslOpts = sslOpts
         this.verbose = true;
+        this.routes = [];
     }
     init({
         port,
@@ -307,37 +362,65 @@ class Server {
         handlers && this.malta.log_info(`  with extra handlers \`${handlers}\``);
         this.malta.log_info(`> webroot is ${folder}`.blue());
         this.dir = process.cwd();
-
-        if (this.sslOpts.ssl) {
-            this.srv = restify.createServer({
-                name: 'malta-restify-ssl',
-                key: fs.readFileSync(this.sslOpts.sslKeyPath),
-                certificate: fs.readFileSync(this.sslOpts.sslCrtPath)
-            });
-        } else {
-            this.srv = restify.createServer({
-                name: 'malta-restify'
-            });
-        }
-
-        this.srv.pre(cors.preflight);
-        this.srv.pre(restify.plugins.pre.dedupeSlashes());
-
-        this.srv.use(plugins.queryParser());
-        this.srv.use(restifyBodyParser());
-        this.srv.use(cors.actual);
-
-        this.srv.on('after', (req, res, route, error) => {
-            if (!error && self.verbose) {
-                self.malta.log_info([
-                    route.spec.method,
-                    route.spec.path.replace(/\:([A-Za-z]*)/, ($1, $2) =>
-                        $2 in req.params ? req.params[$2] : $2
-                    ),
-                    `(took ${+new Date - req.time() - delay}ms + ${delay}ms delay)`
-                ].join(' '));
+        this.routes = [];
+        const requestListener = async (req, res) => {
+            applyDefaultHeaders(res);
+            if (req.method === 'OPTIONS') {
+                res.statusCode = CODES.NO_CONTENT;
+                return res.end();
             }
-        });
+            const startedAt = Date.now();
+            const reqUrl = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
+            const pathname = reqUrl.pathname;
+            const route = this.routes.find(r => r.method === req.method && r.regex.test(pathname));
+            if (!route) {
+                res.statusCode = CODES.NOT_FOUND;
+                return res.end();
+            }
+
+            const match = pathname.match(route.regex);
+            const params = {};
+            route.names.forEach((name, idx) => {
+                params[name] = match[idx + 1];
+            });
+            req.params = params;
+            req.query = Object.fromEntries(reqUrl.searchParams.entries());
+            req.body = await parseBody(req);
+            req.is = type => ((req.headers['content-type'] || '').toLowerCase().includes(type.toLowerCase()));
+            req.time = () => startedAt;
+
+            const wrappedRes = createResponseWrapper(res);
+            const next = () => {};
+
+            try {
+                if (delay > 0) {
+                    await new Promise(solve => setTimeout(solve, delay));
+                }
+                await route.handler(req, wrappedRes, next);
+                if (self.verbose) {
+                    const fullPath = route.path.replace(/\:([A-Za-z]*)/, ($1, $2) =>
+                        $2 in req.params ? req.params[$2] : $2
+                    );
+                    self.malta.log_info([
+                        req.method,
+                        fullPath,
+                        `(took ${Date.now() - req.time() - delay}ms + ${delay}ms delay)`
+                    ].join(' '));
+                }
+            } catch (e) {
+                res.statusCode = CODES.ERROR;
+                res.end();
+                this.malta.log_err('Error', e);
+            }
+        };
+
+        this.srv = this.sslOpts.ssl
+            ? https.createServer({
+                key: fs.readFileSync(this.sslOpts.sslKeyPath),
+                cert: fs.readFileSync(this.sslOpts.sslCrtPath)
+            }, requestListener)
+            : http.createServer(requestListener);
+        this.srv.name = this.sslOpts.ssl ? 'malta-restify-ssl' : 'malta-restify';
 
         return this;
     }
@@ -397,13 +480,15 @@ class Server {
                                         ...base
                                     });
 
-                            self.srv[mappedVerb](
-                                endpoint.path.replace(/\:id/, `:${endpoint.key}`),
-                                // first delay, then handle
-                                (req, res, next) => new Promise(
-                                    solve => setTimeout(solve, delay)
-                                ).then(() => reqHandler(req, res, next))
-                            );
+                            const routePath = endpoint.path.replace(/\:id/, `:${endpoint.key}`);
+                            const { regex, names } = compileRoute(routePath);
+                            self.routes.push({
+                                method: verb,
+                                path: routePath,
+                                regex,
+                                names,
+                                handler: reqHandler
+                            });
 
                         } catch (e) {
                             this.malta.log_err('Error', e);
@@ -411,6 +496,7 @@ class Server {
                     })
                 )
                 this.srv.listen(port, host, () => {
+                    this.srv.url = `http://${host}:${port}`;
                     this.malta.log_info(`- ${this.srv.name} listening at ${this.srv.url}`);
                 });
                 this.malta.log_info('- start server');
