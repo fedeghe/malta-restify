@@ -1,6 +1,6 @@
 {
     "name": "malta-restify",
-    "version": "1.1.12",
+    "version": "1.1.13",
     "description": "Malta plugin to start a development rest server.",
     "repository": {
         "type": "git",

@@ -64,6 +64,13 @@ const requireUncached = requiredModule => {
         req.on('end', () => {
             const raw = Buffer.concat(chunks).toString();
             if (!raw) return resolve({});
+            const contentType = (req.headers['content-type'] || '').toLowerCase();
+            if (contentType.includes('application/x-www-form-urlencoded')) {
+                const out = {};
+                const params = new URLSearchParams(raw);
+                for (const [k, v] of params.entries()) out[k] = v;
+                return resolve(out);
+            }
             try {
                 resolve(JSON.parse(raw));
             } catch (e) {
@@ -75,7 +82,7 @@ const requireUncached = requiredModule => {
     applyDefaultHeaders = res => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
         res.setHeader('Server', 'malta-restify');
     },
     createResponseWrapper = res => ({
@@ -364,17 +371,24 @@ class Server {
         this.dir = process.cwd();
         this.routes = [];
         const requestListener = async (req, res) => {
-            applyDefaultHeaders(res);
-            if (req.method === 'OPTIONS') {
-                res.statusCode = CODES.NO_CONTENT;
-                return res.end();
-            }
             const startedAt = Date.now();
             const reqUrl = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
             const pathname = reqUrl.pathname;
-            const route = this.routes.find(r => r.method === req.method && r.regex.test(pathname));
+            const route = this.routes.find(r =>
+                (r.method === req.method || (req.method === 'OPTIONS' && r.regex.test(pathname))) &&
+                r.regex.test(pathname)
+            );
             if (!route) {
                 res.statusCode = CODES.NOT_FOUND;
+                return res.end();
+            }
+            applyDefaultHeaders(res);
+            if (req.method === 'OPTIONS') {
+                const requestedHeaders = req.headers['access-control-request-headers'];
+                if (requestedHeaders) {
+                    res.setHeader('Access-Control-Allow-Headers', requestedHeaders);
+                }
+                res.statusCode = CODES.NO_CONTENT;
                 return res.end();
             }
 
@@ -495,6 +509,12 @@ class Server {
                         }
                     })
                 )
+                this.srv.on('error', err => {
+                    this.malta.log_err(`server listen error: ${err && err.code ? err.code : err}`);
+                    if (err && err.message) {
+                        this.malta.log_err(err.message);
+                    }
+                });
                 this.srv.listen(port, host, () => {
                     this.srv.url = `http://${host}:${port}`;
                     this.malta.log_info(`- ${this.srv.name} listening at ${this.srv.url}`);
